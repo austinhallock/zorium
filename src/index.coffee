@@ -1,17 +1,21 @@
 _ = require 'lodash'
 
 State = require './state'
-dyo = require 'dyo'
+# missing Context (useContext)
+preact = require 'preact'
+preactCompat = require 'preact/compat'
+preactHooks = require 'preact/hooks'
+renderToString = require 'preact-render-to-string'
 parseTag = require './parse_tag'
-{
-  h, useMemo, Context, useContext, useState,
-  useResource, useLayout, Suspense, render
-} = dyo
+{h, render} = preact
+{Component, Suspense} = preactCompat
+{useMemo, useContext, useState, useLayoutEffect} = preactHooks
 
 DEFAULT_TIMEOUT_MS = 250
 
 z = (tagName, props, children...) ->
-  unless _.isPlainObject(props)
+  isVNode = props?.__v
+  if isVNode or not _.isPlainObject(props)
     if props?
       children = [props].concat children
     props = {}
@@ -24,17 +28,32 @@ z = (tagName, props, children...) ->
 
   h tagName, props, children
 
-RootContext = ({shouldSuspend, awaitStable, children}) ->
-  z Context, {value: {shouldSuspend, awaitStable}}, children
+# RootContext = ({shouldSuspend, awaitStable, children}) ->
+#   z Context, {value: {shouldSuspend, awaitStable}}, children
 
 module.exports = _.defaults {
   z
 
-  Boundary: ({children, fallback}) ->
-    z dyo.Boundary,
-      fallback: (err) ->
-        fallback err.message
-      children
+  Boundary: class Boundary extends Component
+    constructor: (props) ->
+      super props
+      @state = hasError: false
+
+    componentDidCatch: (error, info) =>
+      @setState {error, hasError: true}
+
+    render: =>
+      if @state.hasError
+        console.log 'error', @state.error
+        @props.fallback
+
+      @props.children
+
+  # Boundary: ({children, fallback}) ->
+  #   z dyo.Boundary,
+  #     fallback: (err) ->
+  #       fallback err.message
+  #     children
 
   classKebab: (classes) ->
     _.map _.keys(_.pickBy classes, _.identity), _.kebabCase
@@ -44,7 +63,7 @@ module.exports = _.defaults {
     not (e.which > 1 or e.shiftKey or e.altKey or e.metaKey or e.ctrlKey)
 
   useStream: (cb) ->
-    {awaitStable, shouldSuspend} = useContext RootContext
+    {awaitStable, shouldSuspend} = {} # useContext RootContext
     state = useMemo ->
       # TODO: only call cb() if not shouldSuspend and not awaitStable?
       State(cb())
@@ -66,7 +85,7 @@ module.exports = _.defaults {
             stableDisposable.unsubscribe()
         .then -> state.getValue()
     else if window?
-      useLayout ->
+      useLayoutEffect ->
         subscription = state.subscribe setValue, setError
         # TODO: tests for unsubscribe
         ->
@@ -82,35 +101,37 @@ module.exports = _.defaults {
 
     value
 
-  render: (tree, $$root) ->
-    render z(RootContext, {shouldSuspend: false}, tree), $$root
+  # render: (tree, $$root) ->
+  #   render z(RootContext, {shouldSuspend: false}, tree), $$root
 
   renderToString: (tree, {timeout} = {}) ->
-    timeout ?= DEFAULT_TIMEOUT_MS
+    renderToString tree
 
-    stablePromises = []
-    awaitStable = (x) -> stablePromises.push x
-    initialHtml = await render \
-      z(RootContext, {shouldSuspend: false, awaitStable}, tree), {}
-
-    try
-      return await Promise.race [
-        Promise.all stablePromises
-        .then (stableDisposables) ->
-          render \
-            z(RootContext, {shouldSuspend: true}, z Suspense, tree), {}
-          .then (html) ->
-            _.map stableDisposables, (stableDisposable) ->
-              stableDisposable.unsubscribe()
-            html
-        new Promise (resolve, reject) ->
-          setTimeout ->
-            reject new Error 'Timeout'
-          , timeout
-      ]
-    catch err
-      Object.defineProperty err, 'html',
-        value: initialHtml
-        enumerable: false
-      throw err
-}, dyo
+    # timeout ?= DEFAULT_TIMEOUT_MS
+    #
+    # stablePromises = []
+    # awaitStable = (x) -> stablePromises.push x
+    # initialHtml = await render \
+    #   z(RootContext, {shouldSuspend: false, awaitStable}, tree), {}
+    #
+    # try
+    #   return await Promise.race [
+    #     Promise.all stablePromises
+    #     .then (stableDisposables) ->
+    #       render \
+    #         z(RootContext, {shouldSuspend: true}, z Suspense, tree), {}
+    #       .then (html) ->
+    #         _.map stableDisposables, (stableDisposable) ->
+    #           stableDisposable.unsubscribe()
+    #         html
+    #     new Promise (resolve, reject) ->
+    #       setTimeout ->
+    #         reject new Error 'Timeout'
+    #       , timeout
+    #   ]
+    # catch err
+    #   Object.defineProperty err, 'html',
+    #     value: initialHtml
+    #     enumerable: false
+    #   throw err
+}, preactCompat, preactHooks, preact
