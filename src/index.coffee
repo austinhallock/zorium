@@ -1,4 +1,12 @@
-_ = require 'lodash'
+_isPlainObject = require 'lodash/isPlainObject'
+_isArray = require 'lodash/isArray'
+_isString = require 'lodash/isString'
+_defaults = require 'lodash/defaults'
+_map = require 'lodash/map'
+_keys = require 'lodash/keys'
+_pickBy = require 'lodash/pickBy'
+_identity = require 'lodash/identity'
+_kebabCase = require 'lodash/kebabCase'
 
 State = require './state'
 # missing Context (useContext)
@@ -15,15 +23,15 @@ DEFAULT_TIMEOUT_MS = 250
 
 z = (tagName, props, children...) ->
   isVNode = props?.__v
-  if isVNode or not _.isPlainObject(props)
+  if isVNode or not _isPlainObject(props)
     if props?
       children = [props].concat children
     props = {}
 
-  if _.isArray children[0]
+  if _isArray children[0]
     children = children[0]
 
-  if _.isString tagName
+  if _isString tagName
     tagName = parseTag tagName, props
 
   h tagName, props, children
@@ -31,7 +39,7 @@ z = (tagName, props, children...) ->
 # RootContext = ({shouldSuspend, awaitStable, children}) ->
 #   z Context, {value: {shouldSuspend, awaitStable}}, children
 
-module.exports = _.defaults {
+module.exports = _defaults {
   z
 
   Boundary: class Boundary extends Component
@@ -56,7 +64,7 @@ module.exports = _.defaults {
   #     children
 
   classKebab: (classes) ->
-    _.map _.keys(_.pickBy classes, _.identity), _.kebabCase
+    _map _keys(_pickBy classes, _identity), _kebabCase
     .join ' '
 
   isSimpleClick: (e) ->
@@ -121,7 +129,7 @@ module.exports = _.defaults {
     #       render \
     #         z(RootContext, {shouldSuspend: true}, z Suspense, tree), {}
     #       .then (html) ->
-    #         _.map stableDisposables, (stableDisposable) ->
+    #         _map stableDisposables, (stableDisposable) ->
     #           stableDisposable.unsubscribe()
     #         html
     #     new Promise (resolve, reject) ->

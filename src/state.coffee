@@ -1,14 +1,29 @@
-_ = require 'lodash'
-Rx = require 'rxjs/Rx'
+_isPlainObject = require 'lodash/isPlainObject'
+_mapValues = require 'lodash/mapValues'
+_pickBy = require 'lodash/pickBy'
+_isEmpty = require 'lodash/isEmpty'
+_isFunction = require 'lodash/isFunction'
+_map = require 'lodash/map'
+_clone = require 'lodash/clone'
+_assign = require 'lodash/assign'
+RxBehaviorSubject = require('rxjs/BehaviorSubject').BehaviorSubject
+RxObservable = require('rxjs/Observable').Observable
+require 'rxjs/add/observable/combineLatest'
+require 'rxjs/add/observable/defer'
+require 'rxjs/add/observable/of'
+require 'rxjs/add/operator/concat'
+require 'rxjs/add/operator/do'
+require 'rxjs/add/operator/map'
+require 'rxjs/add/operator/distinctUntilChanged'
 
 module.exports = (initialState) ->
-  unless _.isPlainObject(initialState)
+  unless _isPlainObject(initialState)
     throw new Error 'initialState must be a plain object'
 
-  currentState = _.mapValues initialState, (val) ->
+  currentState = _mapValues initialState, (val) ->
     if val?.subscribe?
       # BehaviorSubject
-      if _.isFunction val.getValue
+      if _isFunction val.getValue
         try
           val.getValue()
         catch
@@ -17,26 +32,26 @@ module.exports = (initialState) ->
         null
     else
       val
-  stateSubject = new Rx.BehaviorSubject currentState
-  streams = _.pickBy initialState, (x) -> x?.subscribe?
+  stateSubject = new RxBehaviorSubject currentState
+  streams = _pickBy initialState, (x) -> x?.subscribe?
 
-  pendingStream = if _.isEmpty streams
-    Rx.Observable.of null
+  pendingStream = if _isEmpty streams
+    RxObservable.of null
   else
-    Rx.Observable.combineLatest _.map streams, (val, key) ->
+    RxObservable.combineLatest _map streams, (val, key) ->
       val.do (update) ->
-        currentState = _.assign _.clone(currentState), {
+        currentState = _assign _clone(currentState), {
           "#{key}": update
         }
 
-  state = Rx.Observable.combineLatest \
-  [stateSubject].concat _.map streams, (val, key) ->
-    Rx.Observable.defer ->
-      Rx.Observable.of currentState[key]
+  state = RxObservable.combineLatest \
+  [stateSubject].concat _map streams, (val, key) ->
+    RxObservable.defer ->
+      RxObservable.of currentState[key]
     .concat(
       val.do (update) ->
         if currentState[key] isnt update
-          currentState = _.assign _.clone(currentState), {
+          currentState = _assign _clone(currentState), {
             "#{key}": update
           }
     )
@@ -45,11 +60,11 @@ module.exports = (initialState) ->
 
   state.getValue = -> currentState
   state.set = (diff) ->
-    unless _.isPlainObject(diff)
+    unless _isPlainObject(diff)
       throw new Error 'diff must be a plain object'
 
     didReplace = false
-    _.map diff, (val, key) ->
+    _map diff, (val, key) ->
       if initialState[key]?.subscribe?
         throw new Error 'Attempted to set observable value'
       else
@@ -57,7 +72,7 @@ module.exports = (initialState) ->
           didReplace = true
 
     if didReplace
-      currentState = _.assign _.clone(currentState), diff
+      currentState = _assign _clone(currentState), diff
       stateSubject.next currentState
 
   stablePromise = null
