@@ -10,14 +10,16 @@ _kebabCase = require 'lodash/kebabCase'
 
 State = require './state'
 # missing Context (useContext)
-preact = require 'preact'
+# use preactCompat for everything since the intention is to use react components
+# want to make sure context gets shared properly
+# (https://github.com/preactjs/preact/issues/1757)
 preactCompat = require 'preact/compat'
-preactHooks = require 'preact/hooks'
 renderToString = require 'preact-render-to-string'
 parseTag = require './parse_tag'
-{h, render} = preact
-{Component, Suspense} = preactCompat
-{useMemo, useContext, useState, useLayoutEffect} = preactHooks
+
+{render, createElement, Component, Suspense, useMemo, useContext,
+  useState, useLayoutEffect} = preactCompat
+h = createElement
 
 DEFAULT_TIMEOUT_MS = 250
 
@@ -142,4 +144,4 @@ module.exports = _defaults {
     #     value: initialHtml
     #     enumerable: false
     #   throw err
-}, preactCompat, preactHooks, preact
+}, preactCompat
