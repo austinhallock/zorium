@@ -14,8 +14,8 @@ import parseTag from './parse_tag'
 DEFAULT_TIMEOUT_MS = 250
 
 RootContext = createContext()
-RootContextProvider = ({awaitStable, cache, children}) ->
-  z RootContext.Provider, {value: {awaitStable, cache}}, children
+RootContextProvider = ({awaitStable, cache, timeout, children}) ->
+  z RootContext.Provider, {value: {awaitStable, cache, timeout}}, children
 
 z = (tagName, props, children...) ->
   isVNode = props?.__v
@@ -57,7 +57,7 @@ export isSimpleClick = (e) ->
   not (e.which > 1 or e.shiftKey or e.altKey or e.metaKey or e.ctrlKey)
 
 export useStream = (cb) ->
-  {awaitStable, cache} = useContext(RootContext) or {}
+  {awaitStable, cache, timeout} = useContext(RootContext) or {}
   {state, hash} = useMemo ->
     initialState = cb()
     # TODO: only call cb() if not nd not awaitStable?
@@ -85,7 +85,11 @@ export useStream = (cb) ->
   else if awaitStable
     useMemo -> # this memo is technically pointless since it only renders once
       if awaitStable
+        stableTimeout = setTimeout ->
+          console.log 'timeout', hash
+        , timeout
         awaitStable state._onStable().then (stableDisposable) ->
+          clearTimeout stableTimeout
           setValue value = state.getValue()
           cache[hash] = value
           stableDisposable
@@ -107,7 +111,7 @@ export untilStable = (tree, {timeout} = {}) ->
   awaitStable = (x) -> stablePromises.push x
   cache = {}
   preactRenderToString(
-    z RootContextProvider, {awaitStable, cache}, tree
+    z RootContextProvider, {awaitStable, cache, timeout}, tree
   )
   try
     await Promise.race [
