@@ -65,7 +65,7 @@ export useStream = (cb) ->
       state: State initialState
       # this is a terrible hash and not unique at all. but i can't think of
       # anything better
-      hash: JSON.stringify _.keys initialState
+      hash: (awaitStable or cache) and JSON.stringify _.keys initialState
     }
   , []
 
@@ -90,8 +90,8 @@ export useStream = (cb) ->
           cache[hash] = value
           stableDisposable
     , [awaitStable]
-  else if cache
-    value = cache[hash] or {}
+  else if cache?[hash]
+    value = cache[hash]
 
   value
 
