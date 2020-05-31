@@ -109,16 +109,22 @@ export untilStable = (tree, {timeout} = {}) ->
   preactRenderToString(
     z RootContextProvider, {awaitStable, cache}, tree
   )
-  await Promise.race [
-    Promise.all stablePromises
-    .then (stableDisposables) ->
-      _.map stableDisposables, (stableDisposable) ->
-        stableDisposable.unsubscribe()
-    new Promise (resolve, reject) ->
-      setTimeout ->
-        reject new Error 'Timeout'
-      , timeout
-  ]
+  try
+    await Promise.race [
+      Promise.all stablePromises
+      .then (stableDisposables) ->
+        _.map stableDisposables, (stableDisposable) ->
+          stableDisposable.unsubscribe()
+      new Promise (resolve, reject) ->
+        setTimeout ->
+          reject new Error 'Timeout'
+        , timeout
+    ]
+  catch err
+    Object.defineProperty err, 'cache',
+      value: cache
+      enumerable: false
+    throw err
   cache
 
 # pass in cache from untilStable to have synchronous useStream. even if
