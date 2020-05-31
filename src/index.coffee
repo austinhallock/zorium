@@ -1,7 +1,6 @@
 import * as _ from 'lodash-es'
 
 import State from './state'
-# missing Context (useContext)
 # use preactCompat for everything since the intention is to use react components
 # want to make sure context gets shared properly
 # (https://github.com/preactjs/preact/issues/1757)
@@ -9,10 +8,14 @@ import preactCompat from 'preact/compat'
 import preactRenderToString from 'preact-render-to-string'
 import parseTag from './parse_tag'
 
-{render, createElement, Component, Suspense, useMemo, useContext,
-  useState, useLayoutEffect} = preactCompat
+{Component, createContext, createElement, Suspense, useContext,
+  useLayoutEffect, useMemo, useState} = preactCompat
 
 DEFAULT_TIMEOUT_MS = 250
+
+RootContext = createContext()
+RootContextProvider = ({awaitStable, cache, children}) ->
+  z RootContext.Provider, {value: {awaitStable, cache}}, children
 
 z = (tagName, props, children...) ->
   isVNode = props?.__v
@@ -28,9 +31,6 @@ z = (tagName, props, children...) ->
     tagName = parseTag tagName, props
 
   createElement tagName, props, children
-
-# RootContext = ({shouldSuspend, awaitStable, children}) ->
-#   z Context, {value: {shouldSuspend, awaitStable}}, children
 
 export z = z
 
@@ -49,12 +49,6 @@ export class Boundary extends Component
 
     @props.children
 
-  # Boundary: ({children, fallback}) ->
-  #   z dyo.Boundary,
-  #     fallback: (err) ->
-  #       fallback err.message
-  #     children
-
 export classKebab = (classes) ->
   _.map _.keys(_.pickBy classes, _.identity), _.kebabCase
   .join ' '
@@ -63,10 +57,16 @@ export isSimpleClick = (e) ->
   not (e.which > 1 or e.shiftKey or e.altKey or e.metaKey or e.ctrlKey)
 
 export useStream = (cb) ->
-  {awaitStable, shouldSuspend} = {} # useContext RootContext
-  state = useMemo ->
-    # TODO: only call cb() if not shouldSuspend and not awaitStable?
-    State(cb())
+  {awaitStable, cache} = useContext(RootContext) or {}
+  {state, hash} = useMemo ->
+    initialState = cb()
+    # TODO: only call cb() if not nd not awaitStable?
+    {
+      state: State initialState
+      # this is a terrible hash and not unique at all. but i can't think of
+      # anything better
+      hash: JSON.stringify _.keys initialState
+    }
   , []
 
   [value, setValue] = useState state.getValue()
@@ -75,64 +75,57 @@ export useStream = (cb) ->
   if error?
     throw error
 
-  if shouldSuspend
-    # XXX
-    value = useResource ->
-      state._onStable().then (stableDisposable) ->
-        # TODO: is this a huge performance penalty? (for concurrent)
-        # FIXME: should promise chain the nextTick (+tests)
-        process.nextTick ->
-          stableDisposable.unsubscribe()
-      .then -> state.getValue()
-  else if window?
+  if window?
     useLayoutEffect ->
       subscription = state.subscribe setValue, setError
       # TODO: tests for unsubscribe
       ->
         subscription.unsubscribe()
     , []
-  else
-    useMemo ->
-      if awaitStable?
+  else if awaitStable
+    useMemo -> # this memo is technically pointless since it only renders once
+      if awaitStable
         awaitStable state._onStable().then (stableDisposable) ->
           setValue value = state.getValue()
+          cache[hash] = value
           stableDisposable
     , [awaitStable]
+  else if cache
+    value = cache[hash]
 
   value
 
-# render: (tree, $$root) ->
-#   render z(RootContext, {shouldSuspend: false}, tree), $$root
+# uses very hacky/not good way of caching data
+# cache is based on keys from state object, so multiple components with
+# {user: ...} but for different users will all yield same data...
+# the correct implementation is to not have untilStable and instead have a
+# renderToString that's async. react-async-ssr exists, but has a similar issue
+# where state isn't kept between "renders" so it's basically the same problem.
+export untilStable = (tree, {timeout} = {}) ->
+  timeout ?= DEFAULT_TIMEOUT_MS
+  stablePromises = []
+  awaitStable = (x) -> stablePromises.push x
+  cache = {}
+  preactRenderToString(
+    z RootContextProvider, {awaitStable, cache}, tree
+  )
+  await Promise.race [
+    Promise.all stablePromises
+    .then (stableDisposables) ->
+      _.map stableDisposables, (stableDisposable) ->
+        stableDisposable.unsubscribe()
+    new Promise (resolve, reject) ->
+      setTimeout ->
+        reject new Error 'Timeout'
+      , timeout
+  ]
+  cache
 
-export renderToString = (tree, {timeout} = {}) ->
-  preactRenderToString tree
-
-  # timeout ?= DEFAULT_TIMEOUT_MS
-  #
-  # stablePromises = []
-  # awaitStable = (x) -> stablePromises.push x
-  # initialHtml = await render \
-  #   z(RootContext, {shouldSuspend: false, awaitStable}, tree), {}
-  #
-  # try
-  #   return await Promise.race [
-  #     Promise.all stablePromises
-  #     .then (stableDisposables) ->
-  #       render \
-  #         z(RootContext, {shouldSuspend: true}, z Suspense, tree), {}
-  #       .then (html) ->
-  #         _.map stableDisposables, (stableDisposable) ->
-  #           stableDisposable.unsubscribe()
-  #         html
-  #     new Promise (resolve, reject) ->
-  #       setTimeout ->
-  #         reject new Error 'Timeout'
-  #       , timeout
-  #   ]
-  # catch err
-  #   Object.defineProperty err, 'html',
-  #     value: initialHtml
-  #     enumerable: false
-  #   throw err
+# pass in cache from untilStable to have synchronous useStream. even if
+# everything is cached in exoid, it's still async because of rxjs streams
+export renderToString = (tree, {cache} = {}) ->
+  preactRenderToString(
+    z RootContextProvider, {cache}, tree
+  )
 
 export * from 'preact/compat'
