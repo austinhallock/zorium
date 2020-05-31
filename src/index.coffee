@@ -91,7 +91,7 @@ export useStream = (cb) ->
           stableDisposable
     , [awaitStable]
   else if cache
-    value = cache[hash]
+    value = cache[hash] or {}
 
   value
 
