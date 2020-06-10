@@ -14,7 +14,7 @@
     "frp",
     "coffee"
   ],
-  "main": "src/index.coffee",
+  "main": "src/index.js",
   "scripts": {
     "test": "yarn lint && yarn test-server && yarn test-browser && ./scripts.sh report-coverage",
     "test-server": "./scripts.sh test-server",
