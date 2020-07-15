@@ -1,9 +1,7 @@
-'use strict'
-
 var classIdSplit = /([\.#]?[a-zA-Z0-9\u007F-\uFFFF_:-]+)/
 var notClassId = /^\.|#/
 
-module.exports = function parseTag (tag, props) {
+export default function parseTag (tag, props) {
   if (!tag) {
     return 'DIV'
   }
