@@ -38,28 +38,6 @@ export const z = function (tagName, props, ...children) {
 const RootContext = createContext()
 const RootContextProvider = ({ awaitStable, cache, timeout, children }) => z(RootContext.Provider, { value: { awaitStable, cache, timeout } }, children)
 
-export class Boundary extends Component {
-  constructor (props) {
-    super(props)
-    this.componentDidCatch = this.componentDidCatch.bind(this)
-    this.render = this.render.bind(this)
-    this.state = { hasError: false }
-  }
-
-  componentDidCatch (error, info) {
-    return this.setState({ error, hasError: true })
-  }
-
-  render () {
-    if (this.state.hasError) {
-      console.log('error', this.state.error)
-      this.props.fallback
-    }
-
-    return this.props.children
-  }
-}
-
 export var classKebab = classes => _.map(_.keys(_.pickBy(classes, _.identity)), _.kebabCase)
   .join(' ')
 
