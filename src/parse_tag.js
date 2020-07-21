@@ -3,7 +3,7 @@ var notClassId = /^\.|#/
 
 export default function parseTag (tag, props) {
   if (!tag) {
-    return 'DIV'
+    return 'div'
   }
 
   var noId = !(props.hasOwnProperty('id'))
@@ -12,7 +12,7 @@ export default function parseTag (tag, props) {
   var tagName = null
 
   if (notClassId.test(tagParts[1])) {
-    tagName = 'DIV'
+    tagName = 'div'
   }
 
   var classes, part, type, i
@@ -44,5 +44,5 @@ export default function parseTag (tag, props) {
     props.className = classes.join(' ')
   }
 
-  return props.namespace ? tagName : tagName.toUpperCase()
+  return tagName
 }

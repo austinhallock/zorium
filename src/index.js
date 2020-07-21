@@ -65,18 +65,17 @@ export var useStream = function (cb) {
   }
 
   if (typeof window !== 'undefined' && window !== null) {
-    useLayoutEffect(function () {
+    useLayoutEffect(() => {
       const subscription = state.subscribe(setValue, setError)
       // TODO: tests for unsubscribe
       return () => subscription.unsubscribe()
     }
     , [])
   } else if (awaitStable) {
-    useMemo(function () { // this memo is technically pointless since it only renders once
+    useMemo(() => { // this memo is technically pointless since it only renders once
       if (awaitStable) {
-        const stableTimeout = setTimeout(() => console.log('timeout', hash)
-          , timeout)
-        return awaitStable(state._onStable().then(function (stableDisposable) {
+        const stableTimeout = setTimeout(() => console.log('timeout', hash), timeout)
+        return awaitStable(state._onStable().then((stableDisposable) => {
           clearTimeout(stableTimeout)
           setValue(value = state.getValue())
           cache[hash] = value
@@ -99,10 +98,7 @@ export var useStream = function (cb) {
 // the correct implementation is to not have untilStable and instead have a
 // renderToString that's async. react-async-ssr exists, but has a similar issue
 // where state isn't kept between "renders" so it's basically the same problem.
-export var untilStable = async function (tree, param) {
-  if (param == null) { param = {} }
-  let { timeout } = param
-  if (timeout == null) { timeout = DEFAULT_TIMEOUT_MS }
+export var untilStable = async function (tree, { timeout = DEFAULT_TIMEOUT_MS} = {}) {
   const stablePromises = []
   const awaitStable = x => stablePromises.push(x)
   const cache = {}
@@ -111,10 +107,10 @@ export var untilStable = async function (tree, param) {
   )
   try {
     await (Promise.race([
-      Promise.all(stablePromises)
-        .then(stableDisposables => _.map(stableDisposables, stableDisposable => stableDisposable.unsubscribe())),
-      new Promise((resolve, reject) => setTimeout(() => reject(new Error('Timeout'))
-        , timeout))
+      Promise.all(stablePromises).then(stableDisposables => 
+        _.map(stableDisposables, stableDisposable => stableDisposable.unsubscribe())
+      ),
+      new Promise((resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
     ]))
   } catch (err) {
     Object.defineProperty(err, 'cache', {
