@@ -35,6 +35,20 @@ export const z = function (tagName, props, ...children) {
   return createElement(tagName, props, children)
 }
 
+export const memo = ($el, isEqual) => {
+  isEqual = isEqual || ((prevProps, nextProps) => {
+    return _.isEqualWith(prevProps, nextProps, (val1, val2) => {
+      const val1IsStream = val1?.subscribe
+      const val2IsStream = val1?.subscribe
+      if (val1IsStream || val2IsStream) {
+        return val1IsStream && val1IsStream
+      }
+      return undefined // let lodash _.isEqual handle it
+    })
+  })
+  return preactCompat.memo($el, isEqual)
+}
+
 const RootContext = createContext()
 const RootContextProvider = ({ awaitStable, cache, timeout, children }) => z(RootContext.Provider, { value: { awaitStable, cache, timeout } }, children)
 
@@ -107,7 +121,7 @@ export var untilStable = async function (tree, { timeout = DEFAULT_TIMEOUT_MS} =
   )
   try {
     await (Promise.race([
-      Promise.all(stablePromises).then(stableDisposables => 
+      Promise.all(stablePromises).then(stableDisposables =>
         _.map(stableDisposables, stableDisposable => stableDisposable.unsubscribe())
       ),
       new Promise((resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))

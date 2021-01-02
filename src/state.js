@@ -7,16 +7,15 @@ export default (function (initialState) {
     throw new Error('initialState must be a plain object')
   }
 
-  let currentState = _.mapValues(initialState, function (val) {
+  let currentState = _.mapValues(initialState, (val) => {
     if (val?.subscribe != null) {
-      // BehaviorSubject
-      if (_.isFunction(val.getValue)) {
-        try {
-          return val.getValue()
-        } catch (error) {
-          return null
-        }
-      } else {
+      try {
+        let value
+        // behaviorsubjects & obs with startWith
+        val.pipe(rx.take(1)).subscribe((subValue) => { value = subValue })
+        // don't return observables
+        return value?.subscribe ? null : value
+      } catch {
         return null
       }
     } else {
@@ -33,20 +32,26 @@ export default (function (initialState) {
     })))))
 
   const state = Rx.combineLatest(
-    [stateSubject].concat(_.map(streams, (val, key) => Rx.defer(() => Rx.of(currentState[key]))
-      .pipe(
-        rx.concat(
-          val.pipe(rx.tap(function (update) {
-            if (currentState[key] !== update) {
-              return currentState = _.assign(_.clone(currentState), {
-                [key]: update
-              })
-            }
-          }))
-        ),
-        rx.distinctUntilChanged()
-      ))
-    )).pipe(rx.map(() => currentState))
+    [stateSubject].concat(
+      _.map(streams, (val, key) =>
+        Rx.defer(() => Rx.of(currentState[key]))
+          .pipe(
+            rx.concat(
+              val.pipe(
+                rx.tap((update) => {
+                  if (currentState[key] !== update) {
+                    return currentState = _.assign(_.clone(currentState), {
+                      [key]: update
+                    })
+                  }
+                })
+              )
+            ),
+            rx.distinctUntilChanged()
+          )
+      )
+    )
+  ).pipe(rx.map(() => currentState))
 
   state.getValue = () => currentState
   state.set = function (diff) {
