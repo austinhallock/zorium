@@ -34,12 +34,12 @@ export default (function (initialState) {
         //   .pipe(
         //     rx.concat(
         val.pipe(
+          rx.distinctUntilChanged(),
           rx.tap((update) => {
             if (currentState[key] !== update) {
               currentState[key] = update
             }
-          }),
-          rx.distinctUntilChanged()
+          })
         )
           //   ),
           //   rx.distinctUntilChanged()
