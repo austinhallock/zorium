@@ -71,8 +71,10 @@ export var useStream = function (cb) {
   }
   , [])
 
-  let [value, setValue] = Array.from(useState(state.getValue()))
-  const [error, setError] = Array.from(useState(null))
+  let [value, setValue] = useState(state.getValue())
+  const [, updateState] = useState()
+  const forceRender = () => updateState({})
+  const [error, setError] = useState(null)
 
   if (error != null) {
     throw error
@@ -80,7 +82,13 @@ export var useStream = function (cb) {
 
   if (typeof window !== 'undefined' && window !== null) {
     useLayoutEffect(() => {
-      const subscription = state.subscribe(setValue, setError)
+      const subscription = state.subscribe((state) => {
+        setValue(state)
+        // state is an object, so react thinks it hasn't changed.
+        // one option is to clone the state obj, but forcing a rerender
+        // seems to be more performant
+        forceRender()
+      }, setError)
       // TODO: tests for unsubscribe
       return () => subscription.unsubscribe()
     }

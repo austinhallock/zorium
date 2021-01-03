@@ -25,33 +25,30 @@ export default (function (initialState) {
   const stateSubject = new Rx.BehaviorSubject(currentState)
   const streams = _.pickBy(initialState, x => x?.subscribe != null)
 
-  const pendingStream = _.isEmpty(streams)
-    ? Rx.of(null)
-    : Rx.combineLatest(_.map(streams, (val, key) => val.pipe(rx.tap(update => currentState = _.assign(_.clone(currentState), {
-      [key]: update
-    })))))
-
   const state = Rx.combineLatest(
     [stateSubject].concat(
       _.map(streams, (val, key) =>
-        Rx.defer(() => Rx.of(currentState[key]))
-          .pipe(
-            rx.concat(
-              val.pipe(
-                rx.tap((update) => {
-                  if (currentState[key] !== update) {
-                    return currentState = _.assign(_.clone(currentState), {
-                      [key]: update
-                    })
-                  }
-                })
-              )
-            ),
-            rx.distinctUntilChanged()
-          )
+        // defer seems unnecessary. removing for slight per improvement?
+        // Rx.defer(() => Rx.of(currentState[key]))
+        // Rx.of(currentState[key])
+        //   .pipe(
+        //     rx.concat(
+        val.pipe(
+          rx.tap((update) => {
+            if (currentState[key] !== update) {
+              currentState[key] = update
+            }
+          }),
+          rx.distinctUntilChanged()
+        )
+          //   ),
+          //   rx.distinctUntilChanged()
+          // )
       )
     )
-  ).pipe(rx.map(() => currentState))
+  ).pipe(rx.map(() =>
+    currentState
+  ))
 
   state.getValue = () => currentState
   state.set = function (diff) {
@@ -76,18 +73,36 @@ export default (function (initialState) {
     }
   }
 
-  let stablePromise = null
-  state._onStable = function () {
-    if (stablePromise != null) {
-      return stablePromise
+  // only need for ssr
+  if ((typeof window === 'undefined')) {
+    const pendingStream = _.isEmpty(streams)
+      ? Rx.of(null)
+      : Rx.combineLatest(
+        _.map(streams, (val, key) =>
+          val.pipe(
+            rx.tap((update) => {
+              currentState = _.assign(_.clone(currentState), { [key]: update })
+            })
+          )
+        )
+      )
+
+    let stablePromise = null
+    state._onStable = function () {
+      if (stablePromise != null) {
+        return stablePromise
+      }
+      // NOTE: we subscribe here instead of take(1) to allow for state
+      //  updates caused by chilren to their parents (who have already stabilized)
+      let disposable = null
+      return stablePromise = new Promise((resolve, reject) =>
+        disposable = pendingStream.subscribe(resolve, reject))
+          .catch(function (err) {
+            disposable?.unsubscribe()
+            throw err
+          })
+          .then(() => disposable)
     }
-    // NOTE: we subscribe here instead of take(1) to allow for state
-    //  updates caused by chilren to their parents (who have already stabilized)
-    let disposable = null
-    return stablePromise = new Promise((resolve, reject) => disposable = pendingStream.subscribe(resolve, reject)).catch(function (err) {
-      disposable?.unsubscribe()
-      throw err
-    }).then(() => disposable)
   }
 
   return state
