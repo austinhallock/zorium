@@ -43,7 +43,7 @@ export const memo = ($el, isEqual) => {
       if (val1IsStream || val2IsStream) {
         return val1IsStream && val1IsStream
       }
-      return undefined // let lodash _.isEqual handle it
+      return val1 == val2
     })
   })
   return preactCompat.memo($el, isEqual)
@@ -83,6 +83,9 @@ export var useStream = function (cb) {
   if (typeof window !== 'undefined' && window !== null) {
     useLayoutEffect(() => {
       const subscription = state.subscribe((state) => {
+        // FIXME: unsub to state immediately after route change
+        // unsub should happen before subbb (except for requestsStream stream)
+        // problem is all streams rely on requestStream (for org)
         setValue(state)
         // state is an object, so react thinks it hasn't changed.
         // one option is to clone the state obj, but forcing a rerender
@@ -90,7 +93,9 @@ export var useStream = function (cb) {
         forceRender()
       }, setError)
       // TODO: tests for unsubscribe
-      return () => subscription.unsubscribe()
+      return () => {
+        subscription.unsubscribe()
+      }
     }
     , [])
   } else if (awaitStable) {
