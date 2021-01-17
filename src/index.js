@@ -71,6 +71,8 @@ export var useStream = function (cb) {
   }
   , [])
 
+  // if you get "useState is not a function or its return value is not iterable"
+  // check that you don't have any weird stuff like useRef in a hook or callback
   let [value, setValue] = useState(state.getValue())
   const [, updateState] = useState()
   const forceRender = () => updateState({})
