@@ -37,11 +37,18 @@ export const z = function (tagName, props, ...children) {
 
 export const memo = ($el, isEqual) => {
   isEqual = isEqual || ((prevProps, nextProps) => {
-    return _.isEqualWith(prevProps, nextProps, (val1, val2) => {
+    return _.isEqualWith(prevProps, nextProps, (val1, val2, key) => {
+      if (!key) {
+        // not sure why, but lodash tries comparing the entire props objects first
+        return undefined
+      }
       const val1IsStream = val1?.subscribe
       const val2IsStream = val1?.subscribe
       if (val1IsStream || val2IsStream) {
         return val1IsStream && val1IsStream
+      }
+      if (typeof val1 === 'object' && typeof val2 === 'object') {
+        return _.isEqual(val1, val2)
       }
       return val1 == val2
     })
