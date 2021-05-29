@@ -50,7 +50,7 @@
     "zorium-coffeelint-config": "^1.2.3"
   },
   "dependencies": {
-    "lodash-es": "^4.17.15",
+    "lodash-es": "4.17.15",
     "preact": "10.4.7",
     "preact-render-to-string": "^5.1.8",
     "rxjs": "^7.1.0"
